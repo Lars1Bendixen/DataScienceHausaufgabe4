@@ -1,0 +1,172 @@
+---
+title: "Session4"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+library(e1071)
+library(caret)
+library(pROC)
+```
+
+```{r}
+titanic <- read_delim("titanic.csv", ";", 
+    escape_double = FALSE, trim_ws = TRUE)
+```
+
+
+```{r}
+titanic %>%
+  group_by(survived) %>%
+  summarize(n = n())
+```
+SVM mit den 3 Features pclass,age und sex
+
+```{r}
+titanic_svm <- titanic %>%
+  select(survived,pclass,age,sex,fare,parch) %>%
+  mutate(age = as.numeric(str_replace(age,",","."))) %>%
+  mutate(fare = as.numeric(str_replace(fare,",","."))) %>%
+  mutate(survived = as.factor(survived)) %>%
+  mutate(sex = ifelse(sex == "female", 1, 0)) 
+```
+
+```{r}
+#titanic %>%
+  #mutate(embarked =replace(embarked, which(embarked =="C"), 0))  %>%
+  #mutate(embarked =replace(embarked, which(embarked =="Q"), 1))  %>%
+  #mutate(embarked =replace(embarked, which(embarked =="S"), 2))
+```
+(`Book-Rating` = replace(`Book-Rating`, which(`Book-Rating`==0), NA))
+
+```{r}
+titanic_svm <- na.omit(titanic_svm)  
+titanic_svm <- titanic_svm
+```
+
+```{r}
+train_control <- trainControl(method="cv", number=10, , savePredictions = TRUE)
+```
+
+```{r}
+set.seed(393)
+inTrain <- createDataPartition(
+  y = titanic_svm$survived,
+  p = .8,
+  list = FALSE)
+training <- titanic_svm[ inTrain,]
+testing  <- titanic_svm[-inTrain,]
+```
+
+```{r}
+model.svm <- train(survived~., data=training, trControl=train_control, method="svmLinear")
+summary(model.svm)
+pred <- predict(model.svm, testing[,-1], probability = FALSE)
+```
+```{r}
+model.svm$pred
+```
+```{r}
+(test.results <- cbind(pred, testing))
+test.results <- test.results %>%
+  mutate(survived = as.numeric(survived)) %>%
+  mutate(pred = as.numeric(pred))
+```
+```{r}
+head(attr(pred, "probabilities"))
+```
+
+```{r}
+table(test.results$pred, testing$survived)
+```
+```{r}
+confusionMatrix(pred,testing$survived)
+```
+
+```{r}
+pROC_obj <- roc(test.results$survived, test.results$pred,
+            smoothed = TRUE,
+            ci=TRUE, ci.alpha=0.9, stratified=FALSE,
+            plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
+            print.auc=TRUE, show.thres=TRUE)
+```
+
+```{r}
+saveRDS(model.svm, "./titanic.svm.rds")
+```
+
+Naive Bayes
+```{r}
+my_training <- training %>%
+  mutate(survived = as.factor(survived))%>%
+  mutate(sex = as.factor(sex))%>%
+  mutate(pclass = as.factor(pclass)) %>%
+  mutate(fare = as.factor(fare)) %>%
+  mutate(parch = as.factor(parch)) %>%
+mutate(age = as.factor(ifelse(age < 14, "child", "adult")))
+model <- naiveBayes(survived ~ ., data = my_training)
+model
+```
+
+```{r}
+my_testing <- testing %>%
+  mutate(sex = as.factor(sex)) %>%
+  mutate(pclass = as.factor(pclass))%>%
+  mutate(fare = as.factor(fare)) %>%
+  mutate(parch = as.factor(parch)) %>%
+  mutate(age = as.factor(ifelse(age < 7, "child", "adult")))
+pred <- predict(model, my_testing)
+table(pred, my_testing$survived)
+```
+```{r}
+(test.results <- cbind(pred, my_testing))
+```
+```{r}
+test.results <- test.results %>%
+  mutate(pred = as.numeric(pred))
+pROC_obj <- roc(as.numeric(as.factor(test.results$survived)), test.results$pred,
+            smoothed = TRUE,
+            ci=TRUE, ci.alpha=0.9, stratified=FALSE,
+            plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
+            print.auc=TRUE, show.thres=TRUE)
+
+```
+Decision Tree
+
+```{r}
+library(rpart)
+library(rpart.plot)
+tree<- rpart(survived~., data = training, method = 'class')
+rpart.plot(tree)
+```
+
+```{r}
+dt_results <- predict(tree, testing[,-1], type = 'prob')
+head(model.results.dt <- cbind(testing,dt_results),500)
+```
+```{r}
+test.results2 <- test.results %>%
+  mutate(pred = ifelse(pred>=0.5,1,0))
+table(test.results2$pred, testing$survived)
+```
+
+```{r}
+pROC_obj <- roc(model.results.dt$survived,model.results.dt$`1`,
+            smoothed = TRUE,
+            # arguments for ci
+            ci=TRUE, ci.alpha=0.9, stratified=FALSE,
+            # arguments for plot
+            plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
+            print.auc=TRUE, show.thres=TRUE)
+```
+
+
+
+
+
+
+
+
