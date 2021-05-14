@@ -1,11 +1,10 @@
 ---
-title: "Hausaufgabe4 Teil 1"
+title: "Hausaufgabe4 Teil 3"
 output:
   html_document:
     df_print: paged
 ---
 
-Vorbereitung für die Hausaufgabe
 ```{r}
 library(tidyverse)
 library(e1071)
@@ -17,24 +16,21 @@ library(pROC)
 titanic <- read_delim("titanic.csv", ";", 
     escape_double = FALSE, trim_ws = TRUE)
 ```
-Notiz: Ich habe mich dazu entschieden drei verschiedene Notebooks für diese Hausaufgabe anzulegen, da ich Unterschiede bei den verschiedenen Features aufzeigen wollte. Leider lies sich dies nicht in einem Notebook vereinen, weil Schwierigkeiten mit dem Umschreiben des Codes hatte, wenn ich die Algrotihmen mehrmals in einem Notebook verwendete. Daher hier der Teil 1 mit den hinzugefügten Features fare und parch. Am Ende des letzten Teils des letzten Notebooks werde ich versuchen eine größe Erklärung für die Unterschiede in der Performance zu finden. Die simplen Unterschiede sind jeweils kurz unter den Modellen vermerkt.
+
+
+Das letzte Notebook habe ich mit dem Feature embarked (Wo die Passagiere dazugestiegen sind) erstellt.
 
 ```{r}
 titanic_svm <- titanic %>%
-  select(survived,pclass,age,sex,fare,parch) %>%
-  mutate(age = as.numeric(str_replace(age,",","."))) %>%
-  mutate(fare = as.numeric(str_replace(fare,",","."))) %>%
+  select(survived,pclass,age,sex,embarked) %>%
+  mutate (age = as.numeric(str_replace(age,",","."))) %>%
+  mutate (fare = as.numeric(str_replace(age,",","."))) %>%
   mutate(survived = as.factor(survived)) %>%
-  mutate(sex = ifelse(sex == "female", 1, 0)) 
+  mutate(sex = ifelse(sex == "female", 1, 0)) %>%
+  mutate(embarked =replace(embarked, which(embarked =="C"), 0))  %>%
+  mutate(embarked =replace(embarked, which(embarked =="Q"), 1))  %>%
+  mutate(embarked =replace(embarked, which(embarked =="S"), 2))
 ```
-
-```{r}
-#titanic %>%
-  #mutate(embarked =replace(embarked, which(embarked =="C"), 0))  %>%
-  #mutate(embarked =replace(embarked, which(embarked =="Q"), 1))  %>%
-  #mutate(embarked =replace(embarked, which(embarked =="S"), 2))
-```
-(`Book-Rating` = replace(`Book-Rating`, which(`Book-Rating`==0), NA))
 
 ```{r}
 titanic_svm <- na.omit(titanic_svm)  
@@ -60,6 +56,7 @@ model.svm <- train(survived~., data=training, trControl=train_control, method="s
 summary(model.svm)
 pred <- predict(model.svm, testing[,-1], probability = FALSE)
 ```
+
 ```{r}
 model.svm$pred
 ```
@@ -69,6 +66,7 @@ test.results <- test.results %>%
   mutate(survived = as.numeric(survived)) %>%
   mutate(pred = as.numeric(pred))
 ```
+
 ```{r}
 head(attr(pred, "probabilities"))
 ```
@@ -87,7 +85,7 @@ pROC_obj <- roc(test.results$survived, test.results$pred,
             plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
             print.auc=TRUE, show.thres=TRUE)
 ```
-Bei SVM ändert sich nichts an dem Wert, wenn man fare und parch hinzufügt. Scheint so als hätten sie keinen Einfluss.
+Der Wert bei SVM verändert sich das einzige Mal, jedoch ins Negative
 ```{r}
 saveRDS(model.svm, "./titanic.svm.rds")
 ```
@@ -98,8 +96,7 @@ my_training <- training %>%
   mutate(survived = as.factor(survived))%>%
   mutate(sex = as.factor(sex))%>%
   mutate(pclass = as.factor(pclass)) %>%
-  mutate(fare = as.factor(fare)) %>%
-  mutate(parch = as.factor(parch)) %>%
+  mutate(embarked = as.factor(embarked)) %>%
 mutate(age = as.factor(ifelse(age < 14, "child", "adult")))
 model <- naiveBayes(survived ~ ., data = my_training)
 model
@@ -109,15 +106,16 @@ model
 my_testing <- testing %>%
   mutate(sex = as.factor(sex)) %>%
   mutate(pclass = as.factor(pclass))%>%
-  mutate(fare = as.factor(fare)) %>%
-  mutate(parch = as.factor(parch)) %>%
+  mutate(embarked = as.factor(embarked)) %>%
   mutate(age = as.factor(ifelse(age < 7, "child", "adult")))
 pred <- predict(model, my_testing)
 table(pred, my_testing$survived)
 ```
+
 ```{r}
 (test.results <- cbind(pred, my_testing))
 ```
+
 ```{r}
 test.results <- test.results %>%
   mutate(pred = as.numeric(pred))
@@ -128,7 +126,7 @@ pROC_obj <- roc(as.numeric(as.factor(test.results$survived)), test.results$pred,
             print.auc=TRUE, show.thres=TRUE)
 
 ```
-Bei Naive Bates verschlechtert sich der AUC beim Hinzufügen von fare und parch schon recht deutlich. Vermutlich sind die Features nicht ausschlaggebend für das Überleben der Passagiere. Durch das mehrmalige Ausführen der Features bei Naive Bates scheint der AUC somit zu sinken.
+Bei Naive Bates kann das Feature Embarked keine Verbesserung hervorrufen.
 
 Decision Tree
 
@@ -143,6 +141,7 @@ rpart.plot(tree)
 dt_results <- predict(tree, testing[,-1], type = 'prob')
 head(model.results.dt <- cbind(testing,dt_results),500)
 ```
+
 ```{r}
 test.results2 <- test.results %>%
   mutate(pred = ifelse(pred>=0.5,1,0))
@@ -158,11 +157,6 @@ pROC_obj <- roc(model.results.dt$survived,model.results.dt$`1`,
             plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
             print.auc=TRUE, show.thres=TRUE)
 ```
-Beim Decision Tree hingegen verbessert sich der AUC ein wenig. Das simple Hinzufügen von Features egal wie relevant scheint den AUC steigen zu lassen.
-
-
-
-
-
-
-
+Den besten Wert konnte wieder Mal der Decision Tree erzielen, jedoch nicht so hoch, wie mit anderen Features.
+Nun zu der Erklärung der Unterschiede in der Performance der Algorithmen:
+Bei SVM wirkt es so als ob nur signifikante Features, wie Geschlecht, Alter und Klasse eine Verbesserung des AUC-Werts ermöglichen können. Jedes von mir ausgesuchte Feature hat die Performance entweder verschlechtert oder sie ist gleichgeblieben.Bei Naive Bates werden irrelevante Features für das Überleben der Passagiere noch härter bestragt. Es wirkt fast so als wäre Naive Bates ein Faktor von SVM, welcher sich entweder ins positive oder negative auswirkt. Dies könnte daran liegen, dass Naive Bates mehrere Vorgänge hat und die Daten "mehrmals durchgeht". Beim Decision Tree hingegen scheint jedes Feature ein wichtiges für die Überlebenschanchen der Passagiere zu sein. Auch welche die eigentlich irrelevant sein sollten (fare und parch zum Beispiel). Daher würde ich behaupten, umso mehr Features beim Decision Tree desto besser wird auch der AUC-Wert. Ist das sinnig? Eigentlich nicht. Ich habe es daher auch vermieden alle Features gemeinsam in den verschiedenen Modelle zu testen, da dies nur dazu führen würde das der Decision Tree ziemlich gut abschneiden würde und SVM Naive Bates eher nicht.   

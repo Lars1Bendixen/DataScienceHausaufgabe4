@@ -1,11 +1,10 @@
 ---
-title: "Hausaufgabe4 Teil 1"
+title: "Hausaufgabe4 Teil 2"
 output:
   html_document:
     df_print: paged
 ---
 
-Vorbereitung für die Hausaufgabe
 ```{r}
 library(tidyverse)
 library(e1071)
@@ -17,24 +16,18 @@ library(pROC)
 titanic <- read_delim("titanic.csv", ";", 
     escape_double = FALSE, trim_ws = TRUE)
 ```
-Notiz: Ich habe mich dazu entschieden drei verschiedene Notebooks für diese Hausaufgabe anzulegen, da ich Unterschiede bei den verschiedenen Features aufzeigen wollte. Leider lies sich dies nicht in einem Notebook vereinen, weil Schwierigkeiten mit dem Umschreiben des Codes hatte, wenn ich die Algrotihmen mehrmals in einem Notebook verwendete. Daher hier der Teil 1 mit den hinzugefügten Features fare und parch. Am Ende des letzten Teils des letzten Notebooks werde ich versuchen eine größe Erklärung für die Unterschiede in der Performance zu finden. Die simplen Unterschiede sind jeweils kurz unter den Modellen vermerkt.
+
+
+In diesem Notebook gucken wir uns die Veränderungen mit dem Feature sibsp (Wie viel Geschwister hat der Passagier) an.
 
 ```{r}
 titanic_svm <- titanic %>%
-  select(survived,pclass,age,sex,fare,parch) %>%
+  select(survived,pclass,age,sex,sibsp) %>%
   mutate(age = as.numeric(str_replace(age,",","."))) %>%
-  mutate(fare = as.numeric(str_replace(fare,",","."))) %>%
   mutate(survived = as.factor(survived)) %>%
   mutate(sex = ifelse(sex == "female", 1, 0)) 
 ```
 
-```{r}
-#titanic %>%
-  #mutate(embarked =replace(embarked, which(embarked =="C"), 0))  %>%
-  #mutate(embarked =replace(embarked, which(embarked =="Q"), 1))  %>%
-  #mutate(embarked =replace(embarked, which(embarked =="S"), 2))
-```
-(`Book-Rating` = replace(`Book-Rating`, which(`Book-Rating`==0), NA))
 
 ```{r}
 titanic_svm <- na.omit(titanic_svm)  
@@ -87,7 +80,7 @@ pROC_obj <- roc(test.results$survived, test.results$pred,
             plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
             print.auc=TRUE, show.thres=TRUE)
 ```
-Bei SVM ändert sich nichts an dem Wert, wenn man fare und parch hinzufügt. Scheint so als hätten sie keinen Einfluss.
+Wieder keine Veränderung bei SVM festzustellen.
 ```{r}
 saveRDS(model.svm, "./titanic.svm.rds")
 ```
@@ -98,8 +91,7 @@ my_training <- training %>%
   mutate(survived = as.factor(survived))%>%
   mutate(sex = as.factor(sex))%>%
   mutate(pclass = as.factor(pclass)) %>%
-  mutate(fare = as.factor(fare)) %>%
-  mutate(parch = as.factor(parch)) %>%
+  mutate(sibsp = as.factor(sibsp)) %>%
 mutate(age = as.factor(ifelse(age < 14, "child", "adult")))
 model <- naiveBayes(survived ~ ., data = my_training)
 model
@@ -109,8 +101,7 @@ model
 my_testing <- testing %>%
   mutate(sex = as.factor(sex)) %>%
   mutate(pclass = as.factor(pclass))%>%
-  mutate(fare = as.factor(fare)) %>%
-  mutate(parch = as.factor(parch)) %>%
+  mutate(sibsp = as.factor(sibsp)) %>% 
   mutate(age = as.factor(ifelse(age < 7, "child", "adult")))
 pred <- predict(model, my_testing)
 table(pred, my_testing$survived)
@@ -128,7 +119,7 @@ pROC_obj <- roc(as.numeric(as.factor(test.results$survived)), test.results$pred,
             print.auc=TRUE, show.thres=TRUE)
 
 ```
-Bei Naive Bates verschlechtert sich der AUC beim Hinzufügen von fare und parch schon recht deutlich. Vermutlich sind die Features nicht ausschlaggebend für das Überleben der Passagiere. Durch das mehrmalige Ausführen der Features bei Naive Bates scheint der AUC somit zu sinken.
+Bei Naive Bates ist der AUC im Vergleich zu vorher mit den Features fare und parch vebessert, jedoch unverändert wenn man nur die drei Features Geschlecht, Klasse und Alter einstellt.
 
 Decision Tree
 
@@ -158,11 +149,4 @@ pROC_obj <- roc(model.results.dt$survived,model.results.dt$`1`,
             plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
             print.auc=TRUE, show.thres=TRUE)
 ```
-Beim Decision Tree hingegen verbessert sich der AUC ein wenig. Das simple Hinzufügen von Features egal wie relevant scheint den AUC steigen zu lassen.
-
-
-
-
-
-
-
+Mit dem Feature Sbsp erreicht der Decision Tree den höchsten AUC-Wert, den ich herausbekommen konnte.
